@@ -8,7 +8,7 @@ var MongoClient = require('mongodb').MongoClient,
 var log4js = require('log4js'),
     logger = log4js.getLogger();
 
-var cacheTotal = require('../service/cacheTotal');
+var realTotal = require('../service/realTotalMaster');
 
 var mongoDB, adminMongoDB;
 
@@ -87,22 +87,25 @@ var insertDocuments = function(db , model) {
 // Use connect method to connect to the Server
 MongoClient.connect(global.MONGODB.url, function(err, db) {
     if(err){
-        logger.info("failed connect to server");
+        logger.error("failed connect to mongodb");
     }else {
-        logger.info("Connected correctly to server");
+        logger.info("Connected correctly to mongodb");
     }
     mongoDB = db;
 });
 
 
-MongoClient.connect(global.MONGODB.adminUrl, function(err, db) {
-    if(err){
-        logger.info("failed connect to server use admin admin");
-    }else {
-        logger.info("Connected  correctly to server use admin");
-    }
-    adminMongoDB = db;
-});
+if(global.MONGODB.isShard){
+    MongoClient.connect(global.MONGODB.adminUrl, function(err, db) {
+        if(err){
+            logger.error("failed connect to mongodb use admin admin");
+        }else {
+            logger.info("Connected  correctly to mongodb use admin");
+        }
+        adminMongoDB = db;
+    });
+}
+
 
 module.exports = function (){
    return map(function (data) {
@@ -112,6 +115,11 @@ module.exports = function (){
        }catch (e){
            logger.error('parse error');
            return ;
+       }
+
+       //  1-debug 2-info 4-error  ,
+       if(data.level!= 4 && data.level != 2){
+            return ;
        }
 
        if(!data.id ){
@@ -139,7 +147,7 @@ module.exports = function (){
        });
 
        if(data.level == 4){
-           cacheTotal.increase( {id : id });
+           realTotal.increase( id , data);
        }
 
     });
